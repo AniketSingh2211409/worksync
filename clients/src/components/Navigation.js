@@ -67,7 +67,7 @@ const Navigation = () => {
     ? [
         { name: "Dashboard", path: "/dashboard", icon: Briefcase },
         ...(user.userType === "0" || user.userType === "2"
-          ? [{ name: "Post Job", path: "/post-job" }]
+          ? [{ name: "Post Job", path: "/post-job", icon: Plus }]
           : []),
         { name: "Profile", path: "/profile", icon: User },
       ]
@@ -158,7 +158,7 @@ const Navigation = () => {
                     : "text-gray-300 hover:text-white"
                 }`}
               >
-                <item.icon className="w-4 h-4" />
+                {item.icon && <item.icon className="w-4 h-4" />}
                 <span>{item.name}</span>
               </Link>
             ))}

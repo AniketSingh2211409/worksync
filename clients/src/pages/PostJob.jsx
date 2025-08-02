@@ -1,11 +1,21 @@
 // pages/PostJob.js
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { Calendar, DollarSign, FileText, Tag, Plus, X } from "lucide-react";
+import {
+  Calendar,
+  DollarSign,
+  FileText,
+  Tag,
+  Plus,
+  X,
+  Shield,
+  Info,
+} from "lucide-react";
 import { useWeb3 } from "../context/Web3Context";
 import { JOB_CATEGORIES } from "../utils/constants";
+import DepositInfo from "../components/DepositInfo";
 
 const PostJob = () => {
   const [formData, setFormData] = useState({
@@ -18,8 +28,24 @@ const PostJob = () => {
   });
   const [skillInput, setSkillInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const { postJob, account, user } = useWeb3();
+  const [depositPercentage, setDepositPercentage] = useState(5);
+
+  const { postJob, account, user, getSecurityDepositPercentage } = useWeb3();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchDepositPercentage = async () => {
+      if (account) {
+        try {
+          const percentage = await getSecurityDepositPercentage();
+          setDepositPercentage(percentage);
+        } catch (error) {
+          console.error("Error fetching deposit percentage:", error);
+        }
+      }
+    };
+    fetchDepositPercentage();
+  }, [account, getSecurityDepositPercentage]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -46,7 +72,10 @@ const PostJob = () => {
 
     setLoading(true);
     try {
-      await postJob(formData);
+      await postJob({
+        ...formData,
+        skills: formData.skills.join(","), // Convert array to comma-separated string
+      });
       toast.success("Job posted successfully!");
       navigate("/dashboard");
     } catch (error) {
@@ -95,6 +124,11 @@ const PostJob = () => {
       addSkill();
     }
   };
+
+  // Calculate costs
+  const budget = parseFloat(formData.budget || 0);
+  const securityDeposit = (budget * depositPercentage) / 100;
+  const totalRequired = budget + securityDeposit;
 
   // Check if user can post jobs
   if (!user?.isRegistered) {
@@ -149,6 +183,9 @@ const PostJob = () => {
               job posting to attract top talent.
             </p>
           </div>
+
+          {/* Security Deposit Information */}
+          <DepositInfo userType="client" />
 
           <div className="glass rounded-2xl p-8">
             <form onSubmit={handleSubmit} className="space-y-8">
@@ -226,6 +263,60 @@ const PostJob = () => {
                 </div>
               </div>
 
+              {/* Payment Breakdown - Show when budget is entered */}
+              {budget > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 rounded-xl p-6"
+                >
+                  <h4 className="font-semibold text-blue-300 mb-4 flex items-center">
+                    <Shield className="w-5 h-5 mr-2" />
+                    Payment Breakdown
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="bg-gray-800/50 rounded-lg p-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-white">
+                          {budget.toFixed(3)}
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          Job Budget (ETH)
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gray-800/50 rounded-lg p-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-yellow-400">
+                          {securityDeposit.toFixed(6)}
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          Security Deposit ({depositPercentage}%)
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-gray-800/50 rounded-lg p-4 border-2 border-green-500/30">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-400">
+                          {totalRequired.toFixed(6)}
+                        </div>
+                        <div className="text-sm text-gray-400">
+                          Total Required (ETH)
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-start space-x-2 text-sm text-blue-300">
+                    <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <p>
+                      Your security deposit will be refunded when the job is
+                      completed or cancelled. This ensures both parties are
+                      committed to the project.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
               {/* Deadline */}
               <div>
                 <label className="block text-white font-semibold mb-3 text-lg">
@@ -254,7 +345,7 @@ const PostJob = () => {
                       key={index}
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="bg-blue-500/20 text-blue-300 px-3 py-2 rounded-full text-sm flex items-center space-x-2"
+                      className="bg-blue-500/20 text-blue-300 px-4 py-2 rounded-full text-sm flex items-center space-x-2 border border-blue-500/30"
                     >
                       <span>{skill}</span>
                       <button
@@ -279,7 +370,7 @@ const PostJob = () => {
                   <button
                     type="button"
                     onClick={addSkill}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-lg transition-colors flex items-center space-x-2"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors flex items-center space-x-2"
                   >
                     <Plus className="w-5 h-5" />
                     <span>Add</span>
@@ -290,8 +381,8 @@ const PostJob = () => {
               {/* Submit Button */}
               <motion.button
                 type="submit"
-                disabled={loading || !account}
-                className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={loading || !account || budget <= 0}
+                className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed text-lg py-4"
                 whileHover={{ scale: loading ? 1 : 1.02 }}
                 whileTap={{ scale: loading ? 1 : 0.98 }}
               >
@@ -300,10 +391,23 @@ const PostJob = () => {
                     <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     <span>Posting Job...</span>
                   </div>
+                ) : budget > 0 ? (
+                  <div className="flex items-center justify-center space-x-2">
+                    <DollarSign className="w-6 h-6" />
+                    <span>Post Job ({totalRequired.toFixed(3)} ETH Total)</span>
+                  </div>
                 ) : (
                   "Post Job"
                 )}
               </motion.button>
+
+              {/* Warning for insufficient funds */}
+              {budget > 0 && (
+                <div className="text-center text-sm text-gray-400">
+                  Make sure you have at least {totalRequired.toFixed(6)} ETH in
+                  your wallet to cover the job budget and security deposit.
+                </div>
+              )}
             </form>
           </div>
 
@@ -334,12 +438,12 @@ const PostJob = () => {
               className="glass rounded-xl p-6 text-center"
             >
               <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <FileText className="w-6 h-6 text-blue-400" />
+                <Shield className="w-6 h-6 text-blue-400" />
               </div>
               <h3 className="text-white font-semibold mb-2">Secure Escrow</h3>
               <p className="text-gray-400 text-sm">
-                Your funds are held securely in smart contracts until work is
-                completed
+                Your funds and deposits are held securely in smart contracts
+                until work is completed
               </p>
             </motion.div>
 

@@ -39,6 +39,7 @@ coverage/
 
 # Compiled JavaScript map files
 *.map
+.eslintrc.js
 
 # Misc
 *.log

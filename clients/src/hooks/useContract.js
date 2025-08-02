@@ -88,7 +88,7 @@ export const useContract = (web3Instance, account) => {
 
         const result = await contract.methods[method](...params).send({
           from: account,
-          gas: Math.floor(gasEstimate * 1.2), // Add 20% buffer
+          gas: Math.floor(Number(gasEstimate) * 1.2), // Add 20% buffer
           ...options,
         });
 

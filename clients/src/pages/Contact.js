@@ -64,14 +64,14 @@ const Contact = () => {
     {
       icon: Phone,
       title: "Phone",
-      detail: "+1 (555) 123-4567",
+      detail: "+91 8433325953",
       description: "Mon-Fri from 8am to 6pm",
       color: "text-yellow-400",
     },
     {
       icon: MapPin,
       title: "Office",
-      detail: "San Francisco, CA",
+      detail: "Kanpur, India",
       description: "Come say hello!",
       color: "text-purple-400",
     },

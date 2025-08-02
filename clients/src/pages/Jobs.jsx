@@ -1,9 +1,8 @@
-// pages/Jobs.js
+// pages/Jobs.jsx
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, RefreshCw } from "lucide-react";
 import { useWeb3 } from "../context/Web3Context";
-import { JOB_CATEGORIES } from "../utils/constants";
 import JobCard from "../components/JobCard";
 import JobModal from "../components/JobModal";
 import LoadingSpinner from "../components/LoadingSpinner";
@@ -12,15 +11,18 @@ const Jobs = () => {
   const [jobs, setJobs] = useState([]);
   const [filteredJobs, setFilteredJobs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedJob, setSelectedJob] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const { getAllJobs } = useWeb3();
+
+  // Get the functions and constants from Web3Context
+  const { getAllJobs, JOB_CATEGORIES, isConnected } = useWeb3();
 
   useEffect(() => {
     loadJobs();
-  }, []);
+  }, [getAllJobs, isConnected]);
 
   useEffect(() => {
     filterJobs();
@@ -29,37 +31,66 @@ const Jobs = () => {
   const loadJobs = async () => {
     try {
       setLoading(true);
+      console.log("🔄 Loading jobs...");
+
       const allJobs = await getAllJobs();
-      const postedJobs = allJobs.filter(
-        (job) => job.status === "0" || !job.status
-      );
+      console.log("📋 All jobs received:", allJobs.length);
+
+      // Filter for posted jobs (status 0 = "Posted")
+      const postedJobs = allJobs.filter((job) => {
+        return job.status === "0" || job.status === 0;
+      });
+
+      console.log("📋 Posted jobs:", postedJobs.length);
       setJobs(postedJobs);
     } catch (error) {
-      console.error("Error loading jobs:", error);
+      console.error("❌ Error loading jobs:", error);
+      // Could add toast notification here
     } finally {
       setLoading(false);
     }
   };
 
-  // pages/Jobs.js (continued)
-  const filterJobs = () => {
-    let filtered = jobs;
+  const refreshJobs = async () => {
+    try {
+      setRefreshing(true);
+      await loadJobs();
+    } catch (error) {
+      console.error("❌ Error refreshing jobs:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(
-        (job) =>
-          job.title?.toLowerCase().includes(term) ||
-          job.description?.toLowerCase().includes(term) ||
-          (job.skills &&
-            job.skills.some &&
-            job.skills.some((skill) => skill.toLowerCase().includes(term)))
-      );
+  const filterJobs = () => {
+    let filtered = [...jobs]; // Create a copy to avoid mutations
+
+    // Filter by search term
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      filtered = filtered.filter((job) => {
+        const titleMatch = job.title?.toLowerCase().includes(term);
+        const descriptionMatch = job.description?.toLowerCase().includes(term);
+        const skillsMatch =
+          job.skills && Array.isArray(job.skills)
+            ? job.skills.some((skill) => skill.toLowerCase().includes(term))
+            : false;
+
+        return titleMatch || descriptionMatch || skillsMatch;
+      });
     }
 
+    // Filter by category
     if (selectedCategory) {
       filtered = filtered.filter((job) => job.category === selectedCategory);
     }
+
+    // Sort by creation date (newest first)
+    filtered.sort((a, b) => {
+      const dateA = new Date(a.createdAt);
+      const dateB = new Date(b.createdAt);
+      return dateB - dateA;
+    });
 
     setFilteredJobs(filtered);
   };
@@ -67,6 +98,16 @@ const Jobs = () => {
   const handleJobClick = (job) => {
     setSelectedJob(job);
     setShowModal(true);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSelectedCategory("");
+  };
+
+  const handleJobApplied = () => {
+    setShowModal(false);
+    refreshJobs(); // Refresh jobs after applying
   };
 
   if (loading) {
@@ -134,74 +175,130 @@ const Jobs = () => {
                 <option value="" className="bg-gray-800">
                   All Categories
                 </option>
-                {Object.entries(JOB_CATEGORIES).map(([key, value]) => (
-                  <option key={key} value={key} className="bg-gray-800">
-                    {value}
-                  </option>
-                ))}
+                {JOB_CATEGORIES &&
+                  Object.entries(JOB_CATEGORIES).map(([key, value]) => (
+                    <option key={key} value={key} className="bg-gray-800">
+                      {value}
+                    </option>
+                  ))}
               </select>
             </div>
+
+            {/* Refresh Button */}
+            <motion.button
+              onClick={refreshJobs}
+              disabled={refreshing}
+              className="flex items-center space-x-2 px-4 py-2 bg-white/10 border border-white/20 rounded-lg hover:bg-white/20 transition-colors disabled:opacity-50"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <RefreshCw
+                className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
+              />
+              <span className="text-sm text-white">Refresh</span>
+            </motion.button>
           </div>
 
-          {/* Results Count */}
-          <div className="mt-4 text-sm text-gray-400">
-            {filteredJobs.length === 0
-              ? "No jobs found"
-              : `Showing ${filteredJobs.length} job${
-                  filteredJobs.length !== 1 ? "s" : ""
-                }`}
+          {/* Results Count and Filters */}
+          <div className="mt-4 flex items-center justify-between">
+            <div className="text-sm text-gray-400">
+              {filteredJobs.length === 0
+                ? "No jobs found"
+                : `Showing ${filteredJobs.length} job${
+                    filteredJobs.length !== 1 ? "s" : ""
+                  }`}
+              {jobs.length !== filteredJobs.length && (
+                <span className="text-gray-500"> of {jobs.length} total</span>
+              )}
+            </div>
+
             {(searchTerm || selectedCategory) && (
               <button
-                onClick={() => {
-                  setSearchTerm("");
-                  setSelectedCategory("");
-                }}
-                className="ml-2 text-purple-400 hover:text-purple-300"
+                onClick={clearFilters}
+                className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
               >
-                Clear filters
+                Clear all filters
               </button>
             )}
           </div>
         </motion.div>
 
-        {/* Jobs Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <AnimatePresence>
-            {filteredJobs.map((job, index) => (
-              <JobCard
-                key={job.id || index}
-                job={job}
-                index={index}
-                onClick={() => handleJobClick(job)}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
+        {/* Connection Warning */}
+        {!isConnected && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mb-8"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+              <p className="text-yellow-200">
+                Connect your wallet to apply for jobs and access all features.
+              </p>
+            </div>
+          </motion.div>
+        )}
 
-        {/* Empty State */}
-        {filteredJobs.length === 0 && !loading && (
+        {/* Jobs Grid */}
+        {filteredJobs.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <AnimatePresence mode="wait">
+              {filteredJobs.map((job, index) => (
+                <JobCard
+                  key={job.id || `job-${index}`}
+                  job={job}
+                  index={index}
+                  onClick={() => handleJobClick(job)}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
+        ) : (
+          /* Empty State */
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-12"
+            className="text-center py-16"
           >
-            <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-2xl font-bold text-white mb-2">
-              No Jobs Found
-            </h3>
-            <p className="text-gray-400 mb-6">
+            <div className="text-6xl mb-6">
+              {searchTerm || selectedCategory ? "🔍" : "💼"}
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-4">
               {searchTerm || selectedCategory
-                ? "Try adjusting your search filters"
-                : "Be the first to post a job!"}
+                ? "No Jobs Found"
+                : "No Jobs Available"}
+            </h3>
+            <p className="text-gray-400 mb-8 max-w-md mx-auto">
+              {searchTerm || selectedCategory
+                ? "Try adjusting your search filters or check back later for new opportunities."
+                : "Be the first to post a job on the platform!"}
             </p>
-            {!searchTerm && !selectedCategory && (
+
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {searchTerm || selectedCategory ? (
+                <button onClick={clearFilters} className="btn-secondary">
+                  Clear Filters
+                </button>
+              ) : (
+                <button
+                  onClick={() => (window.location.href = "/post-job")}
+                  className="btn-primary"
+                >
+                  Post the First Job
+                </button>
+              )}
+
               <button
-                onClick={() => (window.location.href = "/post-job")}
-                className="btn-primary"
+                onClick={refreshJobs}
+                disabled={refreshing}
+                className="btn-outline flex items-center space-x-2"
               >
-                Post the First Job
+                <RefreshCw
+                  className={`w-4 h-4 ${refreshing ? "animate-spin" : ""}`}
+                />
+                <span>Refresh Jobs</span>
               </button>
-            )}
+            </div>
           </motion.div>
         )}
       </div>
@@ -211,10 +308,7 @@ const Jobs = () => {
         job={selectedJob}
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        onApply={() => {
-          setShowModal(false);
-          loadJobs(); // Refresh jobs after applying
-        }}
+        onApply={handleJobApplied}
       />
     </div>
   );
