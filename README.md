@@ -1,4 +1,4 @@
-# 🚀 WorkSync – Decentralized Job Coordination Platform
+# WorkSync – Decentralized Job Coordination Platform
 
 WorkSync is a Web3-powered decentralized application (DApp) designed to simplify job listings, candidate hiring, and profile management using blockchain technology. It enables secure, trustless hiring workflows through smart contracts and wallet-based authentication.
 
